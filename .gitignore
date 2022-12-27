@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+.DS_Store
+__pycache__/
+*.py[cod]
+
+# Distribution / packaging
+.Python
+*_venv/
+downloads/
+
+
+# logs
+*.log
+
+# app specific folders
+bin/
+download/
