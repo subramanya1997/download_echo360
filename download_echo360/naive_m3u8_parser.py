@@ -1,5 +1,5 @@
+# Copyright (c) Subramanya N. Licensed under the Apache License 2.0. All Rights Reserved
 import re
-
 
 class NaiveM3U8Parser:
     """

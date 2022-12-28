@@ -1,3 +1,4 @@
+# Copyright (c) Subramanya N. Licensed under the Apache License 2.0. All Rights Reserved
 import ffmpy
 import gevent
 from gevent.pool import Pool
