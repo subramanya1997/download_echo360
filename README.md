@@ -43,4 +43,4 @@ You should go to the main Echo360 Lecture page, which usually composed of all th
 
 ## Technical details
 
-The current script uses a web-driver to emulate as a web-browser in order to retrieve the original streaming link. There are current One options for the web-driver: Chrome. It then uses a hls downloader to simultaneously download all the smaller parts of the videos, and combined into one. Transcoding into mp4 will be performed if ffmpeg is present in your system, and all files will be renamed into a nice format.
+The current script uses a web-driver to emulate as a web-browser in order to retrieve the original streaming link. There are current option for the web-driver: Chrome. It then uses a hls downloader to simultaneously download all the smaller parts of the videos, and combined into one. Transcoding into mp4 will be performed if ffmpeg is present in your system, and all files will be renamed into a nice format.
