@@ -1,9 +1,8 @@
 # Download Echo360 Videos
 
-download echo360 is a command-line Python tool that allows you to download lecture videos from any university's Echo360 system. All that's required is the particular course's url. See the FAQ for tips on how to find it.
+download echo360 is a command-line Python tool that allows you to download lecture videos from any university's Echo360 system. All that's required is the particular course's url. See the [FAQ](#faq) for tips on how to find it.
 
 ## Getting Started
----
 
 **Install ffmpeg**
 ```shell
@@ -12,7 +11,7 @@ brew upgrade
 brew install ffmpeg
 ```
 
-### Automated Installation
+## Automated Installation
 Tested on Linux / MacOS. Should work for windows aswell. 
 
 **Linux / MacOS**
@@ -21,7 +20,7 @@ Tested on Linux / MacOS. Should work for windows aswell.
 ./run.sh COURSE_URL  # where COURSE_URL is your course url
 ```
 
-### Script args
+## Script args
 ```shell
 python download_echo360.py URL [-o --output OUTPUT_PATH] 
 
@@ -31,7 +30,17 @@ positional arguments:
                         Default is ./download
 ```
 
-### Operating System
+## Operating System
 -   Linux
 -   OS X
 -   Windows
+
+## FAQ
+
+### How do I retrieve the Course URL for a course?
+
+You should go to the main Echo360 Lecture page, which usually composed of all the lecturer recordings in a list format as shown below. It's the main page that lists all the recorded lectures and gives you the option to stream them or download them individually. This is important for downloading all the available videos from within the course.
+
+## Technical details
+
+The current script uses a web-driver to emulate as a web-browser in order to retrieve the original streaming link. There are current One options for the web-driver: Chrome. It then uses a hls downloader to simultaneously download all the smaller parts of the videos, and combined into one. Transcoding into mp4 will be performed if ffmpeg is present in your system, and all files will be renamed into a nice format.
