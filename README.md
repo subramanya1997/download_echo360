@@ -1,6 +1,13 @@
 # Download Echo360 Videos
+A user-friendly, command-line Python tool for downloading lecture videos from any university's Echo360 system. Simply input the course URL to start the downloading process.
 
-download echo360 is a command-line Python tool that allows you to download lecture videos from any university's Echo360 system. All that's required is the particular course's url. See the [FAQ](#faq) for tips on how to find it.
+### Features:
+- Web-driver emulation to retrieve original streaming links (Chrome)
+- Hls downloader for simultaneous downloading and combining of video parts
+- Transcoding into mp4 format with the use of ffmpeg
+- Renamed files for improved organization
+
+Instructions for finding the course URL can be found in the [FAQ](#faq) section. Make the most of your learning experience by downloading and viewing lectures offline with Echo360 Video Downloader.
 
 ## Getting Started
 
