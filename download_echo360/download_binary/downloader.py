@@ -75,6 +75,15 @@ class BinaryDownloader(object):
 
                 with tarfile.open("{0}/{1}".format(bin_path, filename)) as tar:
                     tar.extractall(path=bin_path)
+        # check if its a folder or file
+        if os.path.isdir("{0}/{1}".format(bin_path, filename.split(".")[0])):
+            # move the folder to bin path
+            shutil.move(
+                "{0}/{1}/chromedriver".format(bin_path, filename.split(".")[0]),
+                "{0}/".format(bin_path),
+            )
+            # remove the extracted folder
+            shutil.rmtree("{0}/{1}".format(bin_path, filename.split(".")[0]))
         # Make the extracted bin executable
         st = os.stat(self.get_bin())
         os.chmod(self.get_bin(), st.st_mode | stat.S_IEXEC)

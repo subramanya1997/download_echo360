@@ -12,9 +12,68 @@ import warnings
 logging.basicConfig(
     format="[%(levelname)s: %(name)-12s] %(message)s",
     level=logging.ERROR)
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", category=UserWarning, module="selenium")
+
+def get_chrome_binary_path():
+    if sys.platform.startswith("win"):
+        # check if chrome is installed in the default directory
+        if os.path.isfile("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"):
+            return "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+        # check if brave is installed in the default directory
+        elif os.path.isfile("C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"):
+            return "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"
+        else:
+            for i in range(3):
+                print("-" * 80)
+                print("Cannot find Chrome or Brave browser in the default directory")
+                print("Example: C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe")
+                path_input = input("Please enter the path to your Chrome or Brave browser: ")
+                if os.path.isfile(path_input):
+                    print("-" * 80)
+                    return path_input
+                else:
+                    print("Invalid path")
+                    print("-" * 80)
+    elif sys.platform.startswith("linux"):
+        # check if chrome is installed in the default directory
+        if os.path.isfile("/usr/bin/google-chrome"):
+            return "/usr/bin/google-chrome"
+        # check if brave is installed in the default directory
+        elif os.path.isfile("/usr/bin/brave-browser"):
+            return "/usr/bin/brave-browser"
+        else:
+            for i in range(3):
+                print("-" * 80)
+                print("Cannot find Chrome or Brave browser in the default directory")
+                print("Example: /usr/bin/google-chrome")
+                path_input = input("Please enter the path to your Chrome or Brave browser: ")
+                if os.path.isfile(path_input):
+                    print("-" * 80)
+                    return path_input
+                else:
+                    print("Invalid path")
+                    print("-" * 80)
+    elif sys.platform.startswith("darwin"):
+        # check if chrome is installed in the default directory
+        if os.path.isfile("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"):
+            return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        # check if brave is installed in the default directory
+        elif os.path.isfile("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"):
+            return "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+        else:
+            for i in range(3):
+                print("-" * 80)
+                print("Cannot find Chrome or Brave browser in the default directory")
+                print("Example: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+                path_input = input("Please enter the path to your Chrome or Brave browser: ")
+                if os.path.isfile(path_input):
+                    print("-" * 80)
+                    return path_input
+                else:
+                    print("Invalid path")
+                    print("-" * 80)
 
 class Echo360Downloader(object):
     def __init__(self, course, output_dir, webdriver_to_use="chrome"):
@@ -28,13 +87,19 @@ class Echo360Downloader(object):
         self._useragent = "Mozilla/5.0 (iPad; CPU OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A5376e Safari/8536.25"
 
         if webdriver_to_use == "chrome":
+            from selenium.webdriver.chrome.service import Service
             from selenium.webdriver.chrome.options import Options
+            from download_echo360.download_binary.chromedriver import (
+                ChromedriverDownloader as binary_downloader
+            )
 
+            _binary_downloader = binary_downloader()
             opts = Options()
+            opts.binary_location = get_chrome_binary_path()
             opts.add_argument("--window-size=1920x1080")
             opts.add_argument("user-agent={}".format(self._useragent))
-            executable_path = "../bin/chromedriver"
-            self._driver = webdriver.Chrome(executable_path=executable_path, chrome_options=opts)
+            service = Service(executable_path="bin/chromedriver")
+            self._driver = webdriver.Chrome(service=service, options=opts)
         
         self._course.set_driver(self._driver)
         self._videos = []

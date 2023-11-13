@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PYTHON=python
-VENV_NAME=_download_echo360_venv
+VENV_NAME=.download_echo360_venv
 
 error_exit(){
     echo "$1" 1>&2
@@ -26,7 +26,7 @@ if [ ! -d "$VENV_NAME" ]; then
     echo Checking pip is installed
     $PYTHON -m ensurepip --default-pip >/dev/null 2>&1
     $PYTHON -m pip >/dev/null 2>&1
-    if [ $? -ne 0]; then 
+    if [ $? -ne 0 ]; then 
         echo pip is still not installed!...
         echo Try to install it with sudo?
         echo Run: \"sudo $PYTHON -m ensurepip --default-pip\"
@@ -38,7 +38,7 @@ if [ ! -d "$VENV_NAME" ]; then
     echo Upgrading pip...
     $PYTHON -m pip install --upgrade pip
     echo Installing all pip dependency inside virtual environment...
-    $PYTHON -m pip install -r requirements.txt || error_clean_exit "Something went wrong while installing pip packages"
+    $PYTHON -m pip install --upgrade --force-reinstall -r requirements.txt || error_clean_exit "Something went wrong while installing pip packages"
 fi
 
 source $VENV_NAME/bin/activate || error_exit "Failed to source virtual environment (try to delete '$VENV_NAME/' and re-run)"
