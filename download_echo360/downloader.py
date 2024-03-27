@@ -75,6 +75,12 @@ def get_chrome_binary_path():
                     print("Invalid path")
                     print("-" * 80)
 
+def names_contain(names, name):
+    for n in names:
+        if name in n:
+            return True
+    return False
+
 class Echo360Downloader(object):
     def __init__(self, course, output_dir, webdriver_to_use="chrome"):
         super(Echo360Downloader, self).__init__()
@@ -128,6 +134,9 @@ class Echo360Downloader(object):
         self._output_dir = os.path.join(
             self._output_dir, "{0}".format(self._course.nice_name).strip()
         )
+        print("> Downloading videos to: {0}".format(self._output_dir))
+        already = os.listdir(self._output_dir)
+        print(f"These files are already under that directory: {already}")
         # replace invalid character for folder
         self.regex_replace_invalid.sub("_", self._output_dir)
         videos_to_be_download = []
@@ -144,7 +153,17 @@ class Echo360Downloader(object):
                                                 date=sub_video.date,
                                                 title=title)
                 
-                videos_to_be_download.append((filename, sub_video))
+                # check if the video is already downloaded
+                print("> Checking if the video '{0}' has already been downloaded...".format(filename))
+                if names_contain(already, filename):
+                    print(
+                        ">> Skipping Lecture '{0}' as it has already been downloaded.".format(
+                            filename
+                        )
+                    )
+                else:
+                    print("> Adding video '{0}' to the download list...".format(filename))
+                    videos_to_be_download.append((filename, sub_video))
         
         print("-" * 80)
         print("    Course: {0}".format(self._course.nice_name))
