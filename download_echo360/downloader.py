@@ -135,8 +135,11 @@ class Echo360Downloader(object):
             self._output_dir, "{0}".format(self._course.nice_name).strip()
         )
         print("> Downloading videos to: {0}".format(self._output_dir))
-        already = os.listdir(self._output_dir)
-        print(f"These files are already under that directory: {already}")
+        if os.path.exists(self._output_dir):
+            already = os.listdir(self._output_dir)
+            print(f"These files are already under that directory: {already}")
+        else:
+            already = []
         # replace invalid character for folder
         self.regex_replace_invalid.sub("_", self._output_dir)
         videos_to_be_download = []
