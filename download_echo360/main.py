@@ -2,8 +2,9 @@
 import logging
 import os
 import re
-from download_echo360.course import Echo360Course
-from download_echo360.downloader import Echo360Downloader
+import requests
+from download_echo360.course import Echo360Course, Echo360PublicVideo
+from download_echo360.downloader import Echo360Downloader, create_driver
 
 
 logging.basicConfig(
@@ -65,3 +66,41 @@ def main(course_url, output_dir="download", course_hostname="", webdriver_to_use
     
     # download all videos
     downloader.download_all()
+
+def download_public_video(video_url, output_dir="download", webdriver_to_use="chrome"):
+    """Download a public Echo360 video without requiring login."""
+    print("> Public Echo360 video detected")
+    print("-" * 80)
+
+    # Extract the media UUID from the URL
+    # URL formats: 
+    #   https://echo360.net.au/media/{uuid}/public
+    #   https://echo360.net.au/public/media/{uuid}
+    uuid_match = re.search(r"/media/([0-9a-fA-F-]+)(?:/public)?", video_url)
+    if not uuid_match:
+        uuid_match = re.search(r"/public/media/([0-9a-fA-F-]+)", video_url)
+    if not uuid_match:
+        print("ERROR: Could not extract video UUID from URL")
+        return
+    
+    media_uuid = uuid_match.group(1)
+    hostname = re.search(r"https?://[^/]+", video_url).group()
+    
+    print(f"> Media UUID: {media_uuid}")
+    print(f"> Hostname: {hostname}")
+    
+    # Create driver with performance logging enabled to capture video URLs
+    driver = create_driver(webdriver_to_use, enable_performance_logging=True)
+    
+    try:
+        # Create public video object and download
+        video = Echo360PublicVideo(uuid=media_uuid, hostname=hostname, driver=driver)
+        
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        video.download(output_dir)
+        print("-" * 80)
+        print("> Download complete!")
+    finally:
+        driver.quit()

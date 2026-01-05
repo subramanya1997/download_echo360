@@ -216,7 +216,7 @@ class Echo360Video(object):
                     urls = set(
                         re.findall(
                             'https://[^,"]*?[.]{}'.format(suffix),
-                            self._driver.page_source.replace("\/", "/"),
+                            self._driver.page_source.replace(r"\/", "/"),
                         )
                     )
                     return urls
@@ -459,3 +459,286 @@ class Echo360Video(object):
             )
             return False
         return True
+
+
+class Echo360PublicVideo(object):
+    """Handles public Echo360 videos that don't require authentication."""
+    
+    def __init__(self, uuid, hostname, driver):
+        self._uuid = uuid
+        self._hostname = hostname
+        self._driver = driver
+        self._urls = []  # List of video URLs (may have multiple streams)
+        self._title = None
+        
+        # Load the public video page to extract video info
+        self._load_video_info()
+    
+    @property
+    def public_url(self):
+        # Use /public/media/{uuid} format which works for both URL types
+        return "{}/public/media/{}".format(self._hostname, self._uuid)
+    
+    def _load_video_info(self):
+        """Load the public video page and extract video URLs from network requests."""
+        import time
+        
+        # Enable network logging to capture video URLs
+        print("> Loading public video page...")
+        self._driver.get(self.public_url)
+        
+        # Wait for page and video player to load
+        time.sleep(8)
+        
+        # Try to extract title from page
+        try:
+            self._title = self._driver.title.replace(" | Echo360", "").strip()
+            if not self._title:
+                self._title = self._uuid
+        except Exception:
+            self._title = self._uuid
+        
+        print(f"> Video title: {self._title}")
+        
+        # Find video URLs from network logs
+        self._urls = self._find_video_urls_from_network()
+        
+        if not self._urls:
+            # Fallback to page source method
+            self._urls = self._find_video_urls_from_page()
+        
+        if not self._urls:
+            raise Exception("Could not find video URL")
+        
+        print(f"> Found {len(self._urls)} video stream(s)")
+    
+    def _find_video_urls_from_network(self):
+        """Extract video URLs from network request logs."""
+        video_urls = []
+        
+        try:
+            logs = self._driver.get_log('performance')
+            
+            for log in logs:
+                try:
+                    message = json.loads(log['message'])['message']
+                    if message['method'] == 'Network.requestWillBeSent':
+                        url = message['params']['request']['url']
+                        
+                        # Look for content.echo360 mp4 files (the actual lecture videos)
+                        # Filter out branding/intro videos
+                        if ('content.echo360' in url and 
+                            '.mp4' in url and 
+                            'branding' not in url):
+                            # Prefer q1 (higher quality) over q0
+                            if url not in video_urls:
+                                video_urls.append(url)
+                except (KeyError, json.JSONDecodeError):
+                    continue
+            
+            # Filter to get best quality - prefer s1q1.mp4 (camera HD) and s0q1.mp4 (screen HD)
+            filtered_urls = []
+            seen_streams = set()
+            
+            # Sort to prioritize q1 over q0
+            video_urls.sort(key=lambda x: ('q1' in x, 's1' in x), reverse=True)
+            
+            for url in video_urls:
+                # Extract stream identifier (s0 or s1)
+                stream_match = re.search(r'/(s\d)q\d\.mp4', url)
+                if stream_match:
+                    stream_id = stream_match.group(1)
+                    if stream_id not in seen_streams:
+                        seen_streams.add(stream_id)
+                        filtered_urls.append(url)
+                        print(f"> Found {stream_id} stream (HD)")
+            
+            return filtered_urls
+            
+        except Exception as e:
+            _logger.debug(f"Failed to get network logs: {e}")
+            return []
+    
+    def _find_video_urls_from_page(self):
+        """Fallback: Extract video URL from the page source."""
+        page_source = self._driver.page_source.replace("\\/", "/")
+        
+        # Try to find content.echo360 mp4 URLs (not branding/intro)
+        mp4_urls = re.findall(r'https://content\.echo360[^"\s,]*?\.mp4[^"\s,]*', page_source)
+        if mp4_urls:
+            # Filter for high quality
+            hq_urls = [url for url in mp4_urls if 'q1.mp4' in url]
+            if hq_urls:
+                return list(set(hq_urls))[:2]  # Return up to 2 streams
+            return list(set(mp4_urls))[:2]
+        
+        # Try to find m3u8 URL
+        m3u8_urls = set(re.findall(r'https://content\.echo360[^"\s,]*?\.m3u8[^"\s,]*', page_source))
+        if m3u8_urls:
+            # Prefer av.m3u8 (audio+video combined)
+            for url in m3u8_urls:
+                if 'av.m3u8' in url:
+                    return [url]
+            return [list(m3u8_urls)[0]]
+        
+        return []
+    
+    def download(self, output_dir, pool_size=50):
+        """Download the public video."""
+        import tqdm
+        
+        # Sanitize filename
+        base_filename = re.sub(r'[\\/:*?"<>|]', '_', self._title)
+        
+        print("-" * 80)
+        
+        session = requests.Session()
+        for cookie in self._driver.get_cookies():
+            session.cookies.set(cookie["name"], cookie["value"])
+        
+        # Separate URLs into video (s0) and audio (s1) streams
+        video_url = None
+        audio_url = None
+        other_urls = []
+        
+        for url in self._urls:
+            if '/s0q' in url:
+                video_url = url
+            elif '/s1q' in url:
+                audio_url = url
+            else:
+                other_urls.append(url)
+        
+        # If we have both video and audio streams, download and combine them
+        if video_url and audio_url:
+            video_file = os.path.join(output_dir, f"{base_filename}_video_temp.mp4")
+            audio_file = os.path.join(output_dir, f"{base_filename}_audio_temp.mp4")
+            final_file = os.path.join(output_dir, f"{base_filename}.mp4")
+            
+            # Download video stream (s0)
+            print(f"Downloading video stream: {base_filename}")
+            self._download_single_url(session, video_url, video_file)
+            
+            # Download audio stream (s1)
+            print(f"Downloading audio stream: {base_filename}")
+            self._download_single_url(session, audio_url, audio_file)
+            
+            # Combine using ffmpeg
+            print("> Combining video and audio streams...")
+            if self._combine_video_audio(video_file, audio_file, final_file):
+                # Clean up temp files
+                os.remove(video_file)
+                os.remove(audio_file)
+                print(f"> Saved to: {final_file}")
+            else:
+                print("> Failed to combine streams, keeping separate files")
+                os.rename(video_file, os.path.join(output_dir, f"{base_filename}_video.mp4"))
+                os.rename(audio_file, os.path.join(output_dir, f"{base_filename}_audio.mp4"))
+        else:
+            # Download streams individually if we can't pair them
+            for i, url in enumerate(self._urls):
+                stream_match = re.search(r'/(s\d)q\d\.mp4', url)
+                stream_name = stream_match.group(1) if stream_match else f"stream{i+1}"
+                
+                if len(self._urls) > 1:
+                    filename = f"{base_filename}_{stream_name}"
+                    print(f"Downloading {stream_name}: {base_filename}")
+                else:
+                    filename = base_filename
+                    print(f"Downloading: {base_filename}")
+                
+                filepath = os.path.join(output_dir, filename + ".mp4")
+                self._download_single_url(session, url, filepath)
+                print(f"> Saved to: {filepath}")
+        
+        print("Done!")
+    
+    def _download_single_url(self, session, url, filepath):
+        """Download a single URL to a file."""
+        import tqdm
+        
+        if url.endswith(".m3u8"):
+            # Handle m3u8 streaming format
+            output_dir = os.path.dirname(filepath)
+            filename = os.path.splitext(os.path.basename(filepath))[0]
+            self._download_m3u8(session, url, output_dir, filename, pool_size=50)
+        else:
+            # Handle direct mp4 download
+            r = session.get(url, stream=True)
+            total_size = int(r.headers.get("content-length", 0))
+            block_size = 1024
+            
+            with tqdm.tqdm(total=total_size, unit="iB", unit_scale=True) as pbar:
+                with open(filepath, "wb") as f:
+                    for data in r.iter_content(block_size):
+                        pbar.update(len(data))
+                        f.write(data)
+    
+    def _combine_video_audio(self, video_file, audio_file, output_file):
+        """Combine video and audio files using ffmpeg."""
+        if os.path.exists(output_file):
+            os.remove(output_file)
+        
+        try:
+            ff = ffmpy.FFmpeg(
+                global_options="-loglevel panic",
+                inputs={video_file: None, audio_file: None},
+                outputs={output_file: ["-c:v", "copy", "-c:a", "aac", "-shortest"]},
+            )
+            ff.run()
+            return True
+        except ffmpy.FFExecutableNotFoundError:
+            print('[WARN] Cannot combine streams - "ffmpeg" not installed.')
+            return False
+        except ffmpy.FFRuntimeError as e:
+            print(f"[Error] ffmpeg failed: {e}")
+            return False
+    
+    def _download_m3u8(self, session, url, output_dir, filename, pool_size):
+        """Download m3u8 streaming video."""
+        from download_echo360.hls_downloader import Downloader, urljoin
+        from download_echo360.naive_m3u8_parser import NaiveM3U8Parser
+        
+        request = session.get(url)
+        if not request.ok:
+            raise Exception("Cannot retrieve m3u8 file")
+        
+        lines = [n for n in request.content.decode().split("\n")]
+        m3u8_parser = NaiveM3U8Parser(lines)
+        m3u8_parser.parse()
+        m3u8_video, m3u8_audio = m3u8_parser.get_video_and_audio()
+        
+        if m3u8_video is None:
+            raise Exception("Failed to find video in m3u8")
+        
+        audio_file = None
+        if m3u8_audio is not None:
+            print("  > Downloading audio:")
+            audio_file = self._download_url_to_dir(
+                urljoin(url, m3u8_audio), output_dir, filename + "_audio", pool_size
+            )
+        
+        print("  > Downloading video:")
+        video_file = self._download_url_to_dir(
+            urljoin(url, m3u8_video), output_dir, filename + "_video", pool_size
+        )
+        
+        print("  > Converting to mp4... ", end="", flush=True)
+        final_file = os.path.join(output_dir, filename + ".mp4")
+        
+        if Echo360Video.combine_audio_video(audio_file, video_file, final_file):
+            if audio_file is not None:
+                os.remove(audio_file)
+            os.remove(video_file)
+    
+    def _download_url_to_dir(self, url, output_dir, filename, pool_size):
+        """Download a URL to the output directory."""
+        from download_echo360.hls_downloader import Downloader
+        
+        downloader = Downloader(pool_size, selenium_cookies=self._driver.get_cookies())
+        downloader.run(url, output_dir, convert_to_mp4=False)
+        
+        ext = downloader.result_file_name.split(".")[-1]
+        result_path = os.path.join(output_dir, f"{filename}.{ext}")
+        os.rename(downloader.result_file_name, result_path)
+        return result_path

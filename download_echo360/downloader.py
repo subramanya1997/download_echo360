@@ -81,6 +81,30 @@ def names_contain(names, name):
             return True
     return False
 
+def create_driver(webdriver_to_use="chrome", enable_performance_logging=False):
+    """Create and return a configured webdriver instance."""
+    useragent = "Mozilla/5.0 (iPad; CPU OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A5436e Safari/8536.25"
+    
+    if webdriver_to_use == "chrome":
+        from selenium.webdriver.chrome.service import Service
+        from selenium.webdriver.chrome.options import Options
+        from webdriver_manager.chrome import ChromeDriverManager
+
+        opts = Options()
+        opts.binary_location = get_chrome_binary_path()
+        opts.add_argument("--window-size=1920x1080")
+        opts.add_argument("user-agent={}".format(useragent))
+        
+        # Enable performance logging to capture network requests (for public video URLs)
+        if enable_performance_logging:
+            opts.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+        
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=opts)
+        return driver
+    
+    raise ValueError(f"Unsupported webdriver: {webdriver_to_use}")
+
 class Echo360Downloader(object):
     def __init__(self, course, output_dir, webdriver_to_use="chrome"):
         super(Echo360Downloader, self).__init__()
@@ -95,16 +119,13 @@ class Echo360Downloader(object):
         if webdriver_to_use == "chrome":
             from selenium.webdriver.chrome.service import Service
             from selenium.webdriver.chrome.options import Options
-            from download_echo360.download_binary.chromedriver import (
-                ChromedriverDownloader as binary_downloader
-            )
+            from webdriver_manager.chrome import ChromeDriverManager
 
-            _binary_downloader = binary_downloader()
             opts = Options()
             opts.binary_location = get_chrome_binary_path()
             opts.add_argument("--window-size=1920x1080")
             opts.add_argument("user-agent={}".format(self._useragent))
-            service = Service(executable_path="bin/chromedriver")
+            service = Service(ChromeDriverManager().install())
             self._driver = webdriver.Chrome(service=service, options=opts)
         
         self._course.set_driver(self._driver)

@@ -5,3 +5,4 @@ requests
 gevent
 wget
 tqdm
+webdriver-manager
